@@ -6,11 +6,10 @@
     tools:context=".mainActivity.MainActivity">
 
     <Button
-        android:id="@+id/bs__select_account"
+        android:id="@+id/bs__open_file"
         style="@style/Widget.AppCompat.Button.Borderless.Colored"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:visibility="gone"
-        android:text="@string/select_account"/>
+        android:text="@string/open_file" />
 </RelativeLayout>

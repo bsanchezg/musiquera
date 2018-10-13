@@ -14,7 +14,13 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.Result;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.ResultCallbacks;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Drive;
+import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveContents;
 import com.musiquera.bsanchezg.musiquera.R;
 
 public class MainActivity extends AppCompatActivity
@@ -27,12 +33,46 @@ public class MainActivity extends AppCompatActivity
 
     private static GoogleApiClient mGoogleApiClient;
 
-    private Button selectAccount;
+    private Button openFile;
+
+    final ResultCallback<DriveApi.DriveContentsResult> driveContentsCallback =
+            new ResultCallbacks<DriveApi.DriveContentsResult>() {
+                @Override
+                public void onSuccess(@NonNull DriveApi.DriveContentsResult driveContentsResult) {
+                    if (driveContentsResult.getStatus().isSuccess()) {
+                        openFileFromGOogleDrive();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Status status) {
+
+                }
+            };
+
+    private void openFileFromGOogleDrive() {
+        IntentSender intentSender = Drive.DriveApi
+                .newOpenFileActivityBuilder()
+                .setMimeType(new String[] { "text/plain", "text/html" })
+        .build(mGoogleApiClient);
+        try {
+
+            startIntentSenderForResult(
+
+                    intentSender, REQUEST_CODE_OPENER, null, 0, 0, 0);
+
+        } catch (IntentSender.SendIntentException e) {
+
+            Log.w(TAG, "Unable to send intent", e);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        openFile = findViewById(R.id.bs__open_file);
     }
 
     /**
@@ -109,6 +149,16 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onConnected(Bundle connectionHint) {
 
+        openFile.setVisibility(View.VISIBLE);
+        openFile.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Drive.DriveApi.newDriveContents(mGoogleApiClient)
+                                .setResultCallback(driveContentsCallback);
+                    }
+                }
+        );
         Toast.makeText(getApplicationContext(), "Connected", Toast.LENGTH_LONG).show();
     }
 

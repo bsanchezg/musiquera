@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Musiquera</string>
-    <string name="select_account">Select Account</string>
+    <string name="open_file">Open File</string>
     <string name="app_id">musiquera-219301</string>
     <string name="api_key">AIzaSyCduJVMjaoESa0sRk7Pd-i4Xb4I1bnd72s</string>
 </resources>
