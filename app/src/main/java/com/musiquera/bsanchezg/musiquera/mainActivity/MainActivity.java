@@ -1,5 +1,6 @@
 package com.musiquera.bsanchezg.musiquera.mainActivity;
 
+import android.content.Intent;
 import android.content.IntentSender;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -24,7 +25,7 @@ public class MainActivity extends AppCompatActivity
     private static final int REQUEST_CODE_RESOLUTION = 1;
     private static final  int REQUEST_CODE_OPENER = 2;
 
-    private GoogleApiClient mGoogleApiClient;
+    private static GoogleApiClient mGoogleApiClient;
 
     private Button selectAccount;
 
@@ -32,19 +33,17 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        selectAccount = findViewById(R.id.bs__select_account);
-
-        selectAccount.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        selectAccount();
-                    }
-                }
-        );
     }
 
-    private void selectAccount() {
+    /**
+     * Called when the activity will start interacting with the user.
+     * At this point your activity is at the top of the activity stack,
+     * with user input going to it.
+     */
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         if (mGoogleApiClient == null) {
 
             /**
@@ -68,39 +67,22 @@ public class MainActivity extends AppCompatActivity
         super.onStop();
         if (mGoogleApiClient != null) {
 
-            // disconnect Google Android Drive API connection.
+            // disconnect Google API client connection
             mGoogleApiClient.disconnect();
         }
         super.onPause();
     }
 
     @Override
-    public void onConnected(@Nullable Bundle bundle) {
-
-        Toast.makeText(getApplicationContext(), "Connected", Toast.LENGTH_LONG).show();
-
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-        Log.i(TAG, "GoogleApiClient connection suspended");
-
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+    public void onConnectionFailed(ConnectionResult result) {
 
         // Called whenever the API client fails to connect.
-        Log.i(TAG, "GoogleApiClient connection failed:" + connectionResult.toString());
+        Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
 
-        if (!connectionResult.hasResolution()) {
+        if (!result.hasResolution()) {
 
             // show the localized error dialog.
-            GoogleApiAvailability.getInstance()
-                    .getErrorDialog(this,
-                            connectionResult.getErrorCode(),
-                            0)
-                    .show();
+            GoogleApiAvailability.getInstance().getErrorDialog(this, result.getErrorCode(), 0).show();
             return;
         }
 
@@ -112,11 +94,31 @@ public class MainActivity extends AppCompatActivity
 
         try {
 
-            connectionResult.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
+            result.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
 
         } catch (IntentSender.SendIntentException e) {
 
             Log.e(TAG, "Exception while starting resolution activity", e);
         }
+    }
+
+    /**
+     * It invoked when Google API client connected
+     * @param connectionHint
+     */
+    @Override
+    public void onConnected(Bundle connectionHint) {
+
+        Toast.makeText(getApplicationContext(), "Connected", Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * It invoked when connection suspended
+     * @param cause
+     */
+    @Override
+    public void onConnectionSuspended(int cause) {
+
+        Log.i(TAG, "GoogleApiClient connection suspended");
     }
 }
