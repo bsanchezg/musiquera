@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Musiquera</string>
+    <string name="select_account">Select Account</string>
 </resources>
