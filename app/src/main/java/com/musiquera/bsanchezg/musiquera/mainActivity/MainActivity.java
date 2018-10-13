@@ -2,6 +2,7 @@ package com.musiquera.bsanchezg.musiquera.mainActivity;
 
 import android.content.Intent;
 import android.content.IntentSender;
+import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -21,6 +22,8 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.OpenFileActivityBuilder;
 import com.musiquera.bsanchezg.musiquera.R;
 
 public class MainActivity extends AppCompatActivity
@@ -32,6 +35,8 @@ public class MainActivity extends AppCompatActivity
     private static final  int REQUEST_CODE_OPENER = 2;
 
     private static GoogleApiClient mGoogleApiClient;
+    private DriveId mFileId;
+
 
     private Button openFile;
 
@@ -53,16 +58,15 @@ public class MainActivity extends AppCompatActivity
     private void openFileFromGOogleDrive() {
         IntentSender intentSender = Drive.DriveApi
                 .newOpenFileActivityBuilder()
-                .setMimeType(new String[] { "text/plain", "text/html" })
-        .build(mGoogleApiClient);
+                .setMimeType(new String[] { "audio/mpeg" })
+                .build(mGoogleApiClient);
+
         try {
-
             startIntentSenderForResult(
-
-                    intentSender, REQUEST_CODE_OPENER, null, 0, 0, 0);
-
+                    intentSender,
+                    REQUEST_CODE_OPENER,
+                    null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
-
             Log.w(TAG, "Unable to send intent", e);
         }
     }
@@ -111,6 +115,38 @@ public class MainActivity extends AppCompatActivity
             mGoogleApiClient.disconnect();
         }
         super.onPause();
+    }
+
+    /**
+     * Handle Response of selected file
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
+    @Override
+    protected void onActivityResult(
+            final int requestCode,
+            final int resultCode,
+            final Intent data) {
+
+        switch (requestCode) {
+            case REQUEST_CODE_OPENER:
+                if (resultCode == RESULT_OK) {
+                    mFileId = (DriveId) data.getParcelableExtra(
+                            OpenFileActivityBuilder.EXTRA_RESPONSE_DRIVE_ID);
+
+                    Log.e("file id", mFileId.getResourceId() + "");
+
+                    String url = "https://drive.google.com/open?id="+ mFileId.getResourceId();
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setData(Uri.parse(url));
+                    startActivity(i);
+                }
+                break;
+            default:
+                super.onActivityResult(requestCode, resultCode, data);
+                break;
+        }
     }
 
     @Override
