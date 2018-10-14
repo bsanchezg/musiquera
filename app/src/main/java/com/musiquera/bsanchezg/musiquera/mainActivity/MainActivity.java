@@ -10,201 +10,201 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.Toast;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.ResultCallbacks;
+import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveClient;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.DriveResourceClient;
+import com.google.android.gms.drive.Metadata;
+import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.OpenFileActivityBuilder;
+import com.google.android.gms.drive.OpenFileActivityOptions;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.Query;
+import com.google.android.gms.drive.query.SearchableField;
+import com.google.android.gms.drive.widget.DataBufferAdapter;
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.TaskCompletionSource;
 import com.musiquera.bsanchezg.musiquera.R;
 
-public class MainActivity extends AppCompatActivity
-        implements GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+import java.util.HashSet;
+import java.util.Set;
 
-    private static final String TAG = "MainActivity";
-    private static final int REQUEST_CODE_RESOLUTION = 1;
-    private static final  int REQUEST_CODE_OPENER = 2;
+public class MainActivity extends AppCompatActivity {
 
-    private static GoogleApiClient mGoogleApiClient;
-    private DriveId mFileId;
+    private static final String TAG = "BaseDriveActivity";
 
+    /**
+     * Request code for google sign-in
+     */
+    protected static final int REQUEST_CODE_SIGN_IN = 0;
 
-    private Button openFile;
+    /**
+     * Request code for the Drive picker
+     */
+    protected static final int REQUEST_CODE_OPEN_ITEM = 1;
 
-    final ResultCallback<DriveApi.DriveContentsResult> driveContentsCallback =
-            new ResultCallbacks<DriveApi.DriveContentsResult>() {
-                @Override
-                public void onSuccess(@NonNull DriveApi.DriveContentsResult driveContentsResult) {
-                    if (driveContentsResult.getStatus().isSuccess()) {
-                        openFileFromGOogleDrive();
-                    }
-                }
+    /**
+     * Handles high-level drive functions like sync
+     */
+    private DriveClient mDriveClient;
 
-                @Override
-                public void onFailure(@NonNull Status status) {
+    /**
+     * Handle access to Drive resources/files.
+     */
+    private DriveResourceClient mDriveResourceClient;
 
-                }
-            };
+    /**
+     * Tracks completion of the drive picker
+     */
+    private TaskCompletionSource<DriveId> mOpenItemTaskSource;
 
-    private void openFileFromGOogleDrive() {
-        IntentSender intentSender = Drive.DriveApi
-                .newOpenFileActivityBuilder()
-                .setMimeType(new String[] { "audio/mpeg" })
-                .build(mGoogleApiClient);
-
-        try {
-            startIntentSenderForResult(
-                    intentSender,
-                    REQUEST_CODE_OPENER,
-                    null, 0, 0, 0);
-        } catch (IntentSender.SendIntentException e) {
-            Log.w(TAG, "Unable to send intent", e);
-        }
-    }
+    private DataBufferAdapter<Metadata> mResultsAdapter;
+    private ListView listItems;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onStart() {
+        super.onStart();
         setContentView(R.layout.activity_main);
-
-        openFile = findViewById(R.id.bs__open_file);
+        listItems = findViewById(R.id.list_items);
+        mResultsAdapter = new ResultsAdapter(this);
+        listItems.setAdapter(mResultsAdapter);
+        signIn();
     }
 
     /**
-     * Called when the activity will start interacting with the user.
-     * At this point your activity is at the top of the activity stack,
-     * with user input going to it.
-     */
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (mGoogleApiClient == null) {
-
-            /**
-             * Create the API client and bind it to an instance variable.
-             * We use this instance as the callback for connection and connection failures.
-             * Since no account name is passed, the user is prompted to choose.
-             */
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(Drive.API)
-                    .addScope(Drive.SCOPE_FILE)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .build();
-        }
-
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if (mGoogleApiClient != null) {
-
-            // disconnect Google API client connection
-            mGoogleApiClient.disconnect();
-        }
-        super.onPause();
-    }
-
-    /**
-     * Handle Response of selected file
-     * @param requestCode
-     * @param resultCode
-     * @param data
+     * Handles resolution callbacks.
      */
     @Override
-    protected void onActivityResult(
-            final int requestCode,
-            final int resultCode,
-            final Intent data) {
-
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         switch (requestCode) {
-            case REQUEST_CODE_OPENER:
+            case REQUEST_CODE_SIGN_IN:
+                if (resultCode != RESULT_OK) {
+                    // Sign-in may fail or be cancelled by the user. For this sample, sign-in is
+                    // required and is fatal. For apps where sign-in is optional, handle
+                    // appropriately
+                    Log.e(TAG, "Sign-in failed.");
+                    finish();
+                    return;
+                }
+
+                Task<GoogleSignInAccount> getAccountTask =
+                        GoogleSignIn.getSignedInAccountFromIntent(data);
+                if (getAccountTask.isSuccessful()) {
+                    initializeDriveClient(getAccountTask.getResult());
+                } else {
+                    Log.e(TAG, "Sign-in failed.");
+                    finish();
+                }
+                break;
+            case REQUEST_CODE_OPEN_ITEM:
                 if (resultCode == RESULT_OK) {
-                    mFileId = (DriveId) data.getParcelableExtra(
-                            OpenFileActivityBuilder.EXTRA_RESPONSE_DRIVE_ID);
-
-                    Log.e("file id", mFileId.getResourceId() + "");
-
-                    String url = "https://drive.google.com/open?id="+ mFileId.getResourceId();
-                    Intent i = new Intent(Intent.ACTION_VIEW);
-                    i.setData(Uri.parse(url));
-                    startActivity(i);
+                    DriveId driveId = data.getParcelableExtra(
+                            OpenFileActivityOptions.EXTRA_RESPONSE_DRIVE_ID);
+//                    mOpenItemTaskSource.setResult(driveId);
+                } else {
+                    mOpenItemTaskSource.setException(new RuntimeException("Unable to open file"));
                 }
                 break;
-            default:
-                super.onActivityResult(requestCode, resultCode, data);
-                break;
         }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
-    @Override
-    public void onConnectionFailed(ConnectionResult result) {
-
-        // Called whenever the API client fails to connect.
-        Log.i(TAG, "GoogleApiClient connection failed: " + result.toString());
-
-        if (!result.hasResolution()) {
-
-            // show the localized error dialog.
-            GoogleApiAvailability.getInstance().getErrorDialog(this, result.getErrorCode(), 0).show();
-            return;
-        }
-
-        /**
-         *  The failure has a resolution. Resolve it.
-         *  Called typically when the app is not yet authorized, and an  authorization
-         *  dialog is displayed to the user.
-         */
-
-        try {
-
-            result.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
-
-        } catch (IntentSender.SendIntentException e) {
-
-            Log.e(TAG, "Exception while starting resolution activity", e);
+    /**
+     * Starts the sign-in process and initializes the Drive client.
+     */
+    protected void signIn() {
+        Set<Scope> requiredScopes = new HashSet<>(2);
+        requiredScopes.add(Drive.SCOPE_FILE);
+        requiredScopes.add(Drive.SCOPE_APPFOLDER);
+        GoogleSignInAccount signInAccount = GoogleSignIn.getLastSignedInAccount(this);
+        if (signInAccount != null && signInAccount.getGrantedScopes().containsAll(requiredScopes)) {
+            initializeDriveClient(signInAccount);
+        } else {
+            GoogleSignInOptions signInOptions =
+                    new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestScopes(Drive.SCOPE_FILE)
+                            .requestScopes(Drive.SCOPE_APPFOLDER)
+                            .build();
+            GoogleSignInClient googleSignInClient = GoogleSignIn.getClient(this, signInOptions);
+            startActivityForResult(googleSignInClient.getSignInIntent(), REQUEST_CODE_SIGN_IN);
         }
     }
 
     /**
-     * It invoked when Google API client connected
-     * @param connectionHint
+     * Continues the sign-in process, initializing the Drive clients with the current
+     * user's account.
      */
-    @Override
-    public void onConnected(Bundle connectionHint) {
+    private void initializeDriveClient(GoogleSignInAccount signInAccount) {
+        mDriveClient = Drive.getDriveClient(getApplicationContext(), signInAccount);
+        mDriveResourceClient = Drive.getDriveResourceClient(getApplicationContext(), signInAccount);
+        onDriveClientReady();
+    }
 
-        openFile.setVisibility(View.VISIBLE);
-        openFile.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        Drive.DriveApi.newDriveContents(mGoogleApiClient)
-                                .setResultCallback(driveContentsCallback);
-                    }
-                }
-        );
-        Toast.makeText(getApplicationContext(), "Connected", Toast.LENGTH_LONG).show();
+
+    /**
+     * Shows a toast message.
+     */
+    protected void showMessage(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     /**
-     * It invoked when connection suspended
-     * @param cause
+     * Called after the user has signed in and the Drive client has been initialized.
      */
-    @Override
-    public void onConnectionSuspended(int cause) {
+    private  void onDriveClientReady() {
+        Query query = new Query.Builder()
+                .addFilter(Filters.eq(SearchableField.MIME_TYPE, "audio/mpeg"))
+                .build();
 
-        Log.i(TAG, "GoogleApiClient connection suspended");
+        Task<MetadataBuffer> queryTask =
+                getDriveResourceClient()
+                .query(query)
+                .addOnSuccessListener(
+                        new OnSuccessListener<MetadataBuffer>() {
+                            @Override
+                            public void onSuccess(MetadataBuffer metadata) {
+                                mResultsAdapter.append(metadata);
+                            }
+                        }
+                ).addOnFailureListener(
+                        new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+                                Log.e(TAG, "Error retrieving files", e);
+                                showMessage("query failed");
+                            }
+                        }
+                );
+
+    }
+
+    protected DriveClient getDriveClient() {
+        return mDriveClient;
+    }
+
+    protected DriveResourceClient getDriveResourceClient() {
+        return mDriveResourceClient;
     }
 }

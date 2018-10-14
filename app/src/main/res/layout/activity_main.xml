@@ -5,11 +5,5 @@
     android:layout_height="match_parent"
     tools:context=".mainActivity.MainActivity">
 
-    <Button
-        android:id="@+id/bs__open_file"
-        style="@style/Widget.AppCompat.Button.Borderless.Colored"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="@string/open_file" />
+    <include layout="@layout/bs__list" />
 </RelativeLayout>

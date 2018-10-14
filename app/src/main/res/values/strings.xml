@@ -3,4 +3,6 @@
     <string name="open_file">Open File</string>
     <string name="app_id">musiquera-219301</string>
     <string name="api_key">AIzaSyCduJVMjaoESa0sRk7Pd-i4Xb4I1bnd72s</string>
+    <string name="select_file">Select File</string>
+    <string name="select_folder">Select Folder</string>
 </resources>
