@@ -50,7 +50,8 @@ import com.musiquera.bsanchezg.musiquera.R;
 import java.util.HashSet;
 import java.util.Set;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity
+        implements ResultsAdapter.Listener {
 
     private static final String TAG = "BaseDriveActivity";
 
@@ -87,7 +88,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         setContentView(R.layout.activity_main);
         listItems = findViewById(R.id.list_items);
-        mResultsAdapter = new ResultsAdapter(this);
+        mResultsAdapter = new ResultsAdapter(this, this);
         listItems.setAdapter(mResultsAdapter);
         signIn();
     }
@@ -206,5 +207,11 @@ public class MainActivity extends AppCompatActivity {
 
     protected DriveResourceClient getDriveResourceClient() {
         return mDriveResourceClient;
+    }
+
+    @Override
+    public void onItemClicked(Metadata metadata) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(metadata.getAlternateLink()));
+        startActivity(intent);
     }
 }
